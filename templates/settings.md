@@ -30,7 +30,7 @@ Configuration for `.claude/settings.json` to automate orchestration workflows.
 
 ## Hooks: Auto-Format After Engineering Writes
 
-Runs prettier/eslint automatically after eng-worker writes files.
+Runs prettier/eslint automatically after an eng-worker (alpha or beta) writes files.
 
 ```json
 {
@@ -68,7 +68,7 @@ Log when each sub-agent phase starts and stops.
         ]
       },
       {
-        "matcher": "eng-worker",
+        "matcher": "eng-worker-alpha|eng-worker-beta",
         "hooks": [
           {
             "type": "command",
@@ -212,7 +212,7 @@ With fork mode enabled:
 
 Define hooks directly in agent `.md` files. These run only while that agent is active.
 
-Example for eng-worker.md:
+Example for eng-worker-alpha.md:
 ```yaml
 hooks:
   PostToolUse:

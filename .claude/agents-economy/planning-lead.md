@@ -1,7 +1,7 @@
 ---
 name: planning-lead
 description: "Analyzes requirements and codebase to produce detailed implementation plans. Use proactively before any feature implementation or major refactor. Produces file-level specs, interface contracts, and parallel task breakdown. (Opus on Max, Sonnet on Economy.)"
-model: opus
+model: sonnet
 tools: Read, Grep, Glob, Bash
 maxTurns: 30
 color: blue

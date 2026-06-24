@@ -128,7 +128,7 @@ Subagents can spawn their own subagents:
 Main Session (depth 0)
   └── coordinator (depth 1)
        ├── planning-lead (depth 2)
-       ├── eng-worker (depth 2)
+       ├── eng-worker-alpha (depth 2)
        └── validator (depth 2)
 ```
 
@@ -239,7 +239,7 @@ Set `CLAUDE_AGENT_SDK_DISABLE_BUILTIN_AGENTS=1` to remove all built-ins and use 
 
 Spawn a teammate using a subagent definition:
 ```
-Spawn a teammate using the eng-worker agent type to implement the API endpoints.
+Spawn a teammate using the eng-worker-alpha agent type to implement the API endpoints.
 ```
 
 The teammate honors the definition's tools and model. The definition's body is appended to the teammate's system prompt as additional instructions (not replacing it).

@@ -13,4 +13,4 @@ $ARGUMENTS
    - Issues found (with severity and file:line)
    - Verdict (APPROVED or NEEDS_FIXES with specific items)
 
-If validation fails, offer to dispatch @eng-worker to fix the issues.
+If validation fails, offer to dispatch @eng-worker-alpha (or @eng-worker-beta) to fix the issues.

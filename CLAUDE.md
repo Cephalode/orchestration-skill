@@ -10,7 +10,8 @@ This project uses a sub-agent orchestration pipeline. For features, bug fixes, a
    - Planning-lead is read-only — it will not modify files
    - Wait for the plan before proceeding to implementation
 
-2. **Engineering**: Dispatch `@eng-worker` sub-agents based on the plan
+2. **Engineering**: Dispatch `@eng-worker-alpha` and `@eng-worker-beta` sub-agents based on the plan
+   - `eng-worker-alpha` handles complex/critical modules; `eng-worker-beta` handles straightforward modules
    - Each worker runs in an isolated worktree (`isolation: worktree`)
    - Workers run in the background for parallelism
    - Assign distinct file ownership per worker to avoid conflicts
@@ -22,7 +23,7 @@ This project uses a sub-agent orchestration pipeline. For features, bug fixes, a
 
 4. **Validation**: Delegate to `@validator` to verify the implementation
    - Validator runs the full test suite and checks for issues
-   - If validation fails, dispatch fixes to `@eng-worker`
+   - If validation fails, dispatch fixes to `@eng-worker-alpha` (or `@eng-worker-beta`)
 
 ## When to Use the Full Pipeline
 
@@ -48,17 +49,21 @@ As the orchestrator (main session), you:
 
 ## Agent Roster
 
-| Agent | Purpose | Model | Writes? |
-|-------|---------|-------|---------|
-| @planning-lead | Analyze, plan, specify | opus | No (read-only) |
-| @eng-worker | Implement features | sonnet | Yes (worktree) |
-| @validator | Test, verify, review | sonnet | No (read-only) |
-| @reviewer | Security & quality review | opus | No (read-only) |
+Models are shown as **Max / Economy** — switch with `./scripts/switch-mode.sh max|economy`.
+
+| Agent | Purpose | Model (Max/Economy) | Writes? |
+|-------|---------|--------------------|---------|
+| @planning-lead | Analyze, plan, specify | opus / sonnet | No (read-only) |
+| @eng-worker-alpha | Implement complex modules (auth, state, architecture) | opus / sonnet | Yes (worktree) |
+| @eng-worker-beta | Implement standard modules (UI, utilities, tests, config) | sonnet / haiku | Yes (worktree) |
+| @validator | Test, verify, review | sonnet / sonnet | No (read-only) |
+| @reviewer | Security & quality review | opus / sonnet | No (read-only) |
+| @coordinator | Nested multi-phase coordination | opus / sonnet | No (delegates) |
 
 ## Quick Reference
 
 - Plan a feature: `/plan "description"` or `@planning-lead analyze and plan: ...`
-- Implement a plan: `/implement` or spawn `@eng-worker` agents per task
+- Implement a plan: `/implement` or spawn `@eng-worker-alpha` / `@eng-worker-beta` agents per task
 - Validate: `/validate` or `@validator run full test suite and review`
 - Full pipeline: `/orchestrate "description"`
 
@@ -80,7 +85,7 @@ Spawn 4 teammates to implement the user profile feature:
 - 'frontend' teammate: implement profile UI in src/components/profile/
 - 'tests' teammate: write integration tests in tests/profiles/
 - 'reviewer' teammate: review code as it's committed
-Use the eng-worker agent type for implementers, validator for the reviewer.
+Use the `eng-worker-alpha` agent type for complex implementers and `eng-worker-beta` for straightforward ones; `validator` for the reviewer.
 ```
 
 Team rules:

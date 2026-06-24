@@ -1,7 +1,7 @@
 ---
 name: coordinator
 description: "Coordinates work across specialized agents. Spawns planning, engineering, and validation sub-agents in sequence. Use for complex multi-phase tasks. (Opus on Max, Sonnet on Economy.)"
-model: opus
+model: sonnet
 tools: Agent(planning-lead, eng-worker-alpha, eng-worker-beta, validator), Read, Bash
 maxTurns: 80
 ---

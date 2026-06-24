@@ -17,7 +17,7 @@ Follow the Orchestration Protocol from CLAUDE.md:
 
 1. **Planning Phase**: Delegate to @planning-lead to analyze the codebase and produce a detailed implementation plan. Wait for the plan.
 
-2. **Engineering Phase**: Based on the plan's task breakdown, dispatch @eng-worker sub-agents. Each worker runs in an isolated worktree in the background. Assign distinct file ownership per worker. Wait for all workers to complete.
+2. **Engineering Phase**: Based on the plan's task breakdown, dispatch @eng-worker-alpha and @eng-worker-beta sub-agents. Each worker runs in an isolated worktree in the background. Assign complex/critical modules to alpha and straightforward modules to beta. Assign distinct file ownership per worker. Wait for all workers to complete.
 
 3. **Merge Phase**: Merge all worktree changes back to the working directory. Resolve any conflicts.
 
@@ -57,13 +57,13 @@ Engineering phase only — implements from an existing plan.
 ```markdown
 # .claude/commands/implement.md
 
-Implement the plan using @eng-worker sub-agents.
+Implement the plan using @eng-worker-alpha and @eng-worker-beta sub-agents.
 
 $ARGUMENTS
 
 Based on the plan (from the conversation or referenced above):
 1. Identify the parallel tasks from the plan's task breakdown
-2. Dispatch one @eng-worker per task, each in an isolated worktree
+2. Dispatch @eng-worker-alpha and/or @eng-worker-beta per task (one worker per task), each in an isolated worktree — assign complex modules to alpha, straightforward ones to beta
 3. Assign distinct file ownership — no two workers edit the same file
 4. Wait for all workers to complete
 5. Merge worktree changes back
@@ -94,7 +94,7 @@ $ARGUMENTS
    - Issues found (with severity and file:line)
    - Verdict (APPROVED or NEEDS_FIXES with specific items)
 
-If validation fails, offer to dispatch @eng-worker to fix the issues.
+If validation fails, offer to dispatch @eng-worker-alpha (or @eng-worker-beta) to fix the issues.
 ```
 
 Usage: `/validate` or `/validate focus on the auth module`
@@ -138,7 +138,7 @@ $ARGUMENTS
 
 1. **Investigate**: Delegate to @planning-lead to investigate the root cause. Read relevant source files, trace the error, and identify the fix.
 
-2. **Fix**: Dispatch @eng-worker to implement the fix based on the investigation.
+2. **Fix**: Dispatch @eng-worker-alpha to implement the fix based on the investigation.
 
 3. **Validate**: Delegate to @validator to run tests and verify the fix.
 

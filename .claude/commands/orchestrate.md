@@ -8,7 +8,7 @@ Follow the Orchestration Protocol from CLAUDE.md:
 
 1. **Planning Phase**: Delegate to @planning-lead to analyze the codebase and produce a detailed implementation plan. Wait for the plan.
 
-2. **Engineering Phase**: Based on the plan's task breakdown, dispatch @eng-worker sub-agents. Each worker runs in an isolated worktree in the background. Assign distinct file ownership per worker. Wait for all workers to complete.
+2. **Engineering Phase**: Based on the plan's task breakdown, dispatch @eng-worker-alpha and @eng-worker-beta sub-agents. Each worker runs in an isolated worktree in the background. Assign complex/critical modules to alpha and straightforward modules to beta. Assign distinct file ownership per worker. Wait for all workers to complete.
 
 3. **Merge Phase**: Merge all worktree changes back to the working directory. Resolve any conflicts.
 

@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: "Expert code reviewer focused on security, performance, and best practices. Use proactively after code changes for thorough review. (Opus on Max, Sonnet on Economy.)"
-model: opus
+model: sonnet
 tools: Read, Grep, Glob
 maxTurns: 20
 color: purple
