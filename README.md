@@ -60,7 +60,7 @@ cd /path/to/your/project && claude
 
 That's it. Claude Code loads the agents, slash commands, and hooks automatically. Use `/orchestrate` for the full pipeline, or `/plan`, `/implement`, `/validate` to run individual phases.
 
-> **Pick a model tier first.** The repo defaults to **Max** mode. If you're on a Pro plan, switch to Economy to control cost: `./scripts/switch-mode.sh economy`. See [Model Tiers](#-model-tiers-max--economy).
+> **Pick a model tier first.** The repo defaults to **Max** mode. If you're on a Pro plan, switch to Economy to control cost: `./scripts/switch-mode.sh economy`. See [Model Tiers](#model-tiers).
 
 > **Prefer to cherry-pick?** Copy just the agents you need from [`.claude/agents/`](.claude/agents/) and the relevant commands from [`.claude/commands/`](.claude/commands/).
 
@@ -70,7 +70,6 @@ That's it. Claude Code loads the agents, slash commands, and hooks automatically
 
 - [Quick Start](#-quick-start)
 - [The Agent Roster](#-the-agent-roster)
-- [Model Tiers (Max & Economy)](#-model-tiers-max--economy)
 - [Configuration](#-configuration)
 - [Architecture](#-architecture)
 - [Workflow Patterns](#-workflow-patterns)
@@ -121,108 +120,47 @@ This harness maps each role from a traditional multi-agent orchestrator onto Cla
 
 ---
 
-## 🧮 Model Tiers (Max & Economy)
-
-Every agent ships in **two variants** defined as model presets in [`orchestration.config.yaml`](orchestration.config.yaml). The active set lives in `.claude/agents/` and is **generated** from that config. A single script switches the active tier and regenerates the agents.
-
-### Max mode (default — best quality)
-
-Opus on the roles where reasoning matters most. Use when you have Max-plan/API budget and want the strongest results.
-
-| Agent | Model |
-|-------|-------|
-| `@planning-lead` | opus |
-| `@eng-worker-alpha` | opus |
-| `@eng-worker-beta` | sonnet |
-| `@validator` | sonnet |
-| `@reviewer` | opus |
-| `@coordinator` | opus |
-
-### Economy mode (Pro-plan friendly)
-
-Sonnet/Haiku across the board. Dramatically lower token cost, still very capable. Ideal for Pro-plan users or high-volume runs.
-
-| Agent | Model |
-|-------|-------|
-| `@planning-lead` | sonnet |
-| `@eng-worker-alpha` | sonnet |
-| `@eng-worker-beta` | haiku |
-| `@validator` | sonnet |
-| `@reviewer` | sonnet |
-| `@coordinator` | sonnet |
-
-### Switching tiers
-
-```bash
-./scripts/switch-mode.sh max        # Opus-heavy (default)
-./scripts/switch-mode.sh economy    # Sonnet/Haiku (cost-saving)
-./scripts/switch-mode.sh            # prints usage
-```
-
-The script updates the `mode:` line in `orchestration.config.yaml` and regenerates the active `.claude/agents/` directory. **Restart Claude Code** afterward so it reloads the agent definitions.
-
-```bash
-./scripts/switch-mode.sh economy   # Pro plan — updates config + regenerates
-# Or manually: edit orchestration.config.yaml, then run:
-./scripts/generate-agents.py
-```
-
----
-
 ## ⚙️ Configuration
 
-The entire agent team is defined in a **single file**: [`orchestration.config.yaml`](orchestration.config.yaml). Edit it, then regenerate:
+### Customizing Agents
+
+Agents are plain Markdown files with YAML frontmatter. Edit any file in `.claude/agents/` directly:
+
+```yaml
+---
+name: eng-worker-alpha
+model: opus              # opus, sonnet, haiku, or inherit
+tools: Read, Write, Edit, Bash
+isolation: worktree
+background: true
+maxTurns: 50
+description: "Senior implementation worker..."
+---
+```
+
+**Supported fields:** `name`, `description`, `model`, `tools`, `disallowedTools`, `permissionMode`, `maxTurns`, `skills`, `mcpServers`, `hooks`, `memory`, `background`, `effort`, `isolation`, `color`
+
+After editing, restart Claude Code or run `/agents` to reload.
+
+### Model Tiers
+
+Two built-in presets for different Claude plans:
+
+| Agent | Max 🔥 | Economy 💰 |
+|-------|-------|-----------|
+| planning-lead | opus | sonnet |
+| eng-worker-alpha | opus | sonnet |
+| eng-worker-beta | sonnet | haiku |
+| validator | sonnet | sonnet |
+| reviewer | opus | sonnet |
+| coordinator | opus | sonnet |
 
 ```bash
-./scripts/generate-agents.py        # regenerates .claude/agents/ from the config
+./scripts/switch-mode.sh economy   # Pro plan
+./scripts/switch-mode.sh max       # Max plan (default)
 ```
 
-The config has three sections:
-
-| Section | What it controls |
-|---------|------------------|
-| `mode:` | Which model preset is active (`max` or `economy`) |
-| `models:` | Model presets — a model per agent per mode |
-| `agents:` | Per-agent metadata: `description`, `tools`, `isolation`, `background`, `maxTurns`, `color` |
-
-### Common customizations
-
-**Change a model** — edit the preset, or override one agent:
-
-```yaml
-models:
-  max:
-    planning-lead: sonnet          # change for the whole mode
-  # ...
-agents:
-  planning-lead:
-    model: opus                    # override the preset for just this agent
-```
-
-**Modify an agent's tools** — edit the `tools` list:
-
-```yaml
-  validator:
-    tools: [Read, Bash, Grep, Glob]   # remove or add tools here
-```
-
-**Add a new agent** — add an entry under `agents:` and a model in each preset:
-
-```yaml
-agents:
-  my-new-agent:
-    description: "Does something useful."
-    tools: [Read, Bash]
-    isolation: none
-    background: false
-    maxTurns: 20
-```
-
-Then run `./scripts/generate-agents.py`. New agents use their `description` as the system prompt; edit the generated `.claude/agents/<name>.md` body to write a richer prompt (it's preserved on subsequent regenerations).
-
-> **Prerequisite:** the generator needs PyYAML — `pip install pyyaml`.
->
-> **What gets regenerated:** only the YAML frontmatter. The system-prompt body of each agent (the markdown after the `---`) is read back from `.claude/agents/` and preserved, so your prompt edits are never overwritten.
+To use custom models per agent, just edit the `model:` field in each `.claude/agents/*.md` file directly — no config file needed.
 
 ---
 
@@ -497,10 +435,9 @@ For a complete reference on how Claude Code's subagent system works under the ho
 orchestration-skill/
 ├── README.md                         # You are here
 ├── CLAUDE.md                         # Orchestration protocol (copy into your project)
-├── orchestration.config.yaml         # ⭐ Single source of truth — edit agents here
 ├── LICENSE                           # MIT
 ├── .claude/                          # Ready-to-use — copy into any project
-│   ├── agents/                       # Active agent set (generated from config)
+│   ├── agents/                       # Agent definitions — edit .md files directly
 │   │   ├── planning-lead.md          # Read-only planner (opus)
 │   │   ├── eng-worker-alpha.md       # Senior implementation worker (opus, worktree)
 │   │   ├── eng-worker-beta.md        # Standard implementation worker (sonnet, worktree)
@@ -517,8 +454,7 @@ orchestration-skill/
 │   │   └── research.md               # Parallel research
 │   └── settings.json                 # Permissions, hooks, security gates
 ├── scripts/
-│   ├── generate-agents.py            # Regenerate .claude/agents/ from the config
-│   └── switch-mode.sh                # Switch Max/Economy (edits config + regenerates)
+│   └── switch-mode.sh                # Switch Max/Economy (sedits model: lines in-place)
 ├── docs/
 │   └── subagent-internals.md         # Deep dive on subagent mechanics
 └── templates/                        # Original templates for reference/customization
