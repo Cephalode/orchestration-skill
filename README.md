@@ -71,6 +71,7 @@ That's it. Claude Code loads the agents, slash commands, and hooks automatically
 - [Quick Start](#-quick-start)
 - [The Agent Roster](#-the-agent-roster)
 - [Model Tiers (Max & Economy)](#-model-tiers-max--economy)
+- [Configuration](#-configuration)
 - [Architecture](#-architecture)
 - [Workflow Patterns](#-workflow-patterns)
 - [Parallel Engineering with Worktrees](#-parallel-engineering-with-worktrees)
@@ -122,7 +123,7 @@ This harness maps each role from a traditional multi-agent orchestrator onto Cla
 
 ## 🧮 Model Tiers (Max & Economy)
 
-Every agent ships in **two variants**, stored under `.claude/agents-max/` and `.claude/agents-economy/`. The active set lives in `.claude/agents/`. A single script copies the tier you want into `.claude/agents/`.
+Every agent ships in **two variants** defined as model presets in [`orchestration.config.yaml`](orchestration.config.yaml). The active set lives in `.claude/agents/` and is **generated** from that config. A single script switches the active tier and regenerates the agents.
 
 ### Max mode (default — best quality)
 
@@ -158,9 +159,70 @@ Sonnet/Haiku across the board. Dramatically lower token cost, still very capable
 ./scripts/switch-mode.sh            # prints usage
 ```
 
-The script copies the selected tier's agent files from `.claude/agents-max/` or `.claude/agents-economy/` into the active `.claude/agents/` directory. **Restart Claude Code** afterward so it reloads the agent definitions.
+The script updates the `mode:` line in `orchestration.config.yaml` and regenerates the active `.claude/agents/` directory. **Restart Claude Code** afterward so it reloads the agent definitions.
 
-The `agents-max/` and `agents-economy/` directories are permanent references — edit the active copy in `.claude/agents/` only for throwaway tweaks, and edit the tier directories for changes you want to keep across switches.
+```bash
+./scripts/switch-mode.sh economy   # Pro plan — updates config + regenerates
+# Or manually: edit orchestration.config.yaml, then run:
+./scripts/generate-agents.py
+```
+
+---
+
+## ⚙️ Configuration
+
+The entire agent team is defined in a **single file**: [`orchestration.config.yaml`](orchestration.config.yaml). Edit it, then regenerate:
+
+```bash
+./scripts/generate-agents.py        # regenerates .claude/agents/ from the config
+```
+
+The config has three sections:
+
+| Section | What it controls |
+|---------|------------------|
+| `mode:` | Which model preset is active (`max` or `economy`) |
+| `models:` | Model presets — a model per agent per mode |
+| `agents:` | Per-agent metadata: `description`, `tools`, `isolation`, `background`, `maxTurns`, `color` |
+
+### Common customizations
+
+**Change a model** — edit the preset, or override one agent:
+
+```yaml
+models:
+  max:
+    planning-lead: sonnet          # change for the whole mode
+  # ...
+agents:
+  planning-lead:
+    model: opus                    # override the preset for just this agent
+```
+
+**Modify an agent's tools** — edit the `tools` list:
+
+```yaml
+  validator:
+    tools: [Read, Bash, Grep, Glob]   # remove or add tools here
+```
+
+**Add a new agent** — add an entry under `agents:` and a model in each preset:
+
+```yaml
+agents:
+  my-new-agent:
+    description: "Does something useful."
+    tools: [Read, Bash]
+    isolation: none
+    background: false
+    maxTurns: 20
+```
+
+Then run `./scripts/generate-agents.py`. New agents use their `description` as the system prompt; edit the generated `.claude/agents/<name>.md` body to write a richer prompt (it's preserved on subsequent regenerations).
+
+> **Prerequisite:** the generator needs PyYAML — `pip install pyyaml`.
+>
+> **What gets regenerated:** only the YAML frontmatter. The system-prompt body of each agent (the markdown after the `---`) is read back from `.claude/agents/` and preserved, so your prompt edits are never overwritten.
 
 ---
 
@@ -435,17 +497,16 @@ For a complete reference on how Claude Code's subagent system works under the ho
 orchestration-skill/
 ├── README.md                         # You are here
 ├── CLAUDE.md                         # Orchestration protocol (copy into your project)
+├── orchestration.config.yaml         # ⭐ Single source of truth — edit agents here
 ├── LICENSE                           # MIT
-├── .claude/                          # ⭐ Ready-to-use — copy into any project
-│   ├── agents/                       # Active agent set (Max mode by default)
+├── .claude/                          # Ready-to-use — copy into any project
+│   ├── agents/                       # Active agent set (generated from config)
 │   │   ├── planning-lead.md          # Read-only planner (opus)
 │   │   ├── eng-worker-alpha.md       # Senior implementation worker (opus, worktree)
 │   │   ├── eng-worker-beta.md        # Standard implementation worker (sonnet, worktree)
 │   │   ├── validator.md              # Test runner + reviewer (sonnet)
 │   │   ├── reviewer.md               # Optional code reviewer (opus)
 │   │   └── coordinator.md            # Advanced nested coordinator (opus)
-│   ├── agents-max/                   # Max-mode reference (Opus-heavy)
-│   ├── agents-economy/               # Economy-mode reference (Sonnet/Haiku)
 │   ├── commands/
 │   │   ├── orchestrate.md            # Full pipeline
 │   │   ├── plan.md                   # Planning only
@@ -456,7 +517,8 @@ orchestration-skill/
 │   │   └── research.md               # Parallel research
 │   └── settings.json                 # Permissions, hooks, security gates
 ├── scripts/
-│   └── switch-mode.sh                # Switch active agents between Max and Economy
+│   ├── generate-agents.py            # Regenerate .claude/agents/ from the config
+│   └── switch-mode.sh                # Switch Max/Economy (edits config + regenerates)
 ├── docs/
 │   └── subagent-internals.md         # Deep dive on subagent mechanics
 └── templates/                        # Original templates for reference/customization

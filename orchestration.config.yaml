@@ -1,0 +1,96 @@
+# ──────────────────────────────────────────────
+# Claude Code Orchestration Configuration
+# ──────────────────────────────────────────────
+# This is the single source of truth for your agent team.
+# Edit this file to customize models, tools, and agent behavior.
+# Then run:  ./scripts/generate-agents.py
+# This regenerates .claude/agents/*.md from this config.
+#
+# The system-prompt BODY of each agent is preserved across regenerations
+# (it lives in .claude/agents/<name>.md). This config controls the
+# frontmatter: model, tools, isolation, background, maxTurns, color.
+
+# Active mode — which model preset to use
+# Options: max, economy
+mode: max
+
+# Model presets — define model per agent per mode
+# Valid models: opus, sonnet, haiku
+models:
+  max:
+    planning-lead: opus
+    eng-worker-alpha: opus
+    eng-worker-beta: sonnet
+    validator: sonnet
+    reviewer: opus
+    coordinator: opus
+  economy:
+    planning-lead: sonnet
+    eng-worker-alpha: sonnet
+    eng-worker-beta: haiku
+    validator: sonnet
+    reviewer: sonnet
+    coordinator: sonnet
+
+# Agent definitions
+# Each agent has: description, tools, isolation, background, maxTurns
+# Optional fields: color, model (override)
+#
+# The `model` field is auto-set from mode + models above.
+# Uncomment `model:` on a specific agent to override the mode preset.
+#
+# Field behavior on output:
+#   - isolation: none      -> omitted from the agent file (it's the default)
+#   - background: false    -> omitted from the agent file (it's the default)
+#   - color               -> included only when present
+agents:
+  planning-lead:
+    # model: opus  # uncomment to override mode preset
+    description: "Analyzes requirements and codebase to produce detailed implementation plans. Use proactively before any feature implementation or major refactor. Produces file-level specs, interface contracts, and parallel task breakdown. (Opus on Max, Sonnet on Economy.)"
+    tools: [Read, Grep, Glob, Bash]
+    isolation: none
+    background: false
+    maxTurns: 30
+    color: blue
+
+  eng-worker-alpha:
+    description: "Senior implementation worker (Opus on Max, Sonnet on Economy). Handles complex modules — auth systems, state management, API integrations, architectural decisions. Runs with worktree isolation."
+    tools: [Read, Write, Edit, Bash, Grep, Glob]
+    isolation: worktree
+    background: true
+    maxTurns: 50
+    color: green
+
+  eng-worker-beta:
+    description: "Standard implementation worker (Sonnet on Max, Haiku on Economy). Handles straightforward modules — UI components, utility functions, tests, config files. Runs with worktree isolation."
+    tools: [Read, Write, Edit, Bash, Grep, Glob]
+    isolation: worktree
+    background: true
+    maxTurns: 50
+    color: cyan
+
+  validator:
+    description: "Runs integration tests, checks imports, verifies functionality, and reviews code quality. Use proactively after engineering work is complete. Read-only — does not modify source code. (Sonnet on both Max and Economy.)"
+    tools: [Read, Bash, Grep, Glob]
+    isolation: none
+    background: false
+    maxTurns: 30
+    color: yellow
+
+  reviewer:
+    description: "Expert code reviewer focused on security, performance, and best practices. Use proactively after code changes for thorough review. (Opus on Max, Sonnet on Economy.)"
+    tools: [Read, Grep, Glob]
+    isolation: none
+    background: false
+    maxTurns: 20
+    color: purple
+
+  coordinator:
+    description: "Coordinates work across specialized agents. Spawns planning, engineering, and validation sub-agents in sequence. Use for complex multi-phase tasks. (Opus on Max, Sonnet on Economy.)"
+    tools:
+      - "Agent(planning-lead, eng-worker-alpha, eng-worker-beta, validator)"
+      - Read
+      - Bash
+    isolation: none
+    background: false
+    maxTurns: 80
