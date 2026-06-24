@@ -1,0 +1,85 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Bash(npm run *)",
+      "Bash(npx *)",
+      "Bash(git *)",
+      "Bash(node *)",
+      "Bash(python *)",
+      "Bash(pytest *)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Read(.env)",
+      "Read(.env.*)"
+    ]
+  },
+  "env": {
+    "CLAUDE_CODE_SUBAGENT_MODEL": ""
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx prettier --write $CLAUDE_FILE_PATHS 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"$CLAUDE_TOOL_INPUT\" | grep -qE '(rm -rf|git push.*--force|git reset --hard|DROP TABLE|\\bDELETE FROM)' && echo 'BLOCKED: Dangerous command detected' && exit 2 || exit 0"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "planning-lead",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[$(date -Iseconds)] PLANNING START\" >> .claude/orchestration.log"
+          }
+        ]
+      },
+      {
+        "matcher": "eng-worker",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[$(date -Iseconds)] ENGINEERING START\" >> .claude/orchestration.log"
+          }
+        ]
+      },
+      {
+        "matcher": "validator",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[$(date -Iseconds)] VALIDATION START\" >> .claude/orchestration.log"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "validator",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[$(date -Iseconds)] VALIDATION COMPLETE\" >> .claude/orchestration.log"
+          }
+        ]
+      }
+    ]
+  }
+}
