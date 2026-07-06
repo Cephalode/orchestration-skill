@@ -57,10 +57,3 @@ Models are set per-agent via the `model:` frontmatter (opus/sonnet/haiku/inherit
 | @planning-lead | Analyze, plan, specify | inherit (read-only) | No |
 | @eng-worker | Implement modules | inherit | Yes (worktree) |
 | @validator | Test, verify, review | inherit (read-only + tests) | No |
-
-## Quick Reference
-
-- Plan a feature: `/plan "description"` or `@planning-lead analyze and plan: ...`
-- Implement a plan: `/orchestrate "description"` (full pipeline) or spawn `@eng-worker` agents per task
-- Validate: `/validate` or `@validator run full test suite and review`
-- Full pipeline: `/orchestrate "description"`

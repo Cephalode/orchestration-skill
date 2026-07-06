@@ -42,8 +42,5 @@ Split into independent tasks that can run in parallel without file conflicts:
 - Testing strategy
 
 ## Rules
-- Always read the relevant source files before planning
-- Identify existing patterns and conventions in the codebase
 - Ensure tasks are split at module boundaries to avoid merge conflicts
 - Specify exact file paths — no ambiguity
-- If the task is too large for one planning cycle, split into phases
