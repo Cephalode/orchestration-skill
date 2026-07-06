@@ -10,12 +10,11 @@ This project uses a sub-agent orchestration pipeline. For features, bug fixes, a
    - Planning-lead is read-only — it will not modify files
    - Wait for the plan before proceeding to implementation
 
-2. **Engineering**: Dispatch `@eng-worker-alpha` and `@eng-worker-beta` sub-agents based on the plan
-   - `eng-worker-alpha` handles complex/critical modules; `eng-worker-beta` handles straightforward modules
+2. **Engineering**: Dispatch `@eng-worker` sub-agents based on the plan
    - Each worker runs in an isolated worktree (`isolation: worktree`)
    - Workers run in the background for parallelism
-   - Assign distinct file ownership per worker to avoid conflicts
-   - For single-module changes, one worker is sufficient
+   - Assign distinct file ownership per worker to avoid conflicts (split at module boundaries)
+   - Spawn one worker for single-module work, two or more for parallel multi-module work
 
 3. **Merge**: After all workers complete, merge their worktree changes
    - Check for merge conflicts at module boundaries
@@ -23,7 +22,7 @@ This project uses a sub-agent orchestration pipeline. For features, bug fixes, a
 
 4. **Validation**: Delegate to `@validator` to verify the implementation
    - Validator runs the full test suite and checks for issues
-   - If validation fails, dispatch fixes to `@eng-worker-alpha` (or `@eng-worker-beta`)
+   - If validation fails, dispatch fixes to `@eng-worker`
 
 ## When to Use the Full Pipeline
 
@@ -49,47 +48,19 @@ As the orchestrator (main session), you:
 
 ## Agent Roster
 
-Models are shown as **Max / Economy** — switch with `./scripts/switch-mode.sh max|economy`.
+Models are set per-agent via the `model:` frontmatter (opus/sonnet/haiku/inherit). For a global economy tier, set `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`.
 
-| Agent | Purpose | Model (Max/Economy) | Writes? |
-|-------|---------|--------------------|---------|
-| @planning-lead | Analyze, plan, specify | opus / sonnet | No (read-only) |
-| @eng-worker-alpha | Implement complex modules (auth, state, architecture) | opus / sonnet | Yes (worktree) |
-| @eng-worker-beta | Implement standard modules (UI, utilities, tests, config) | sonnet / haiku | Yes (worktree) |
-| @validator | Test, verify, review | sonnet / sonnet | No (read-only) |
-| @reviewer | Security & quality review | opus / sonnet | No (read-only) |
-| @coordinator | Nested multi-phase coordination | opus / sonnet | No (delegates) |
+<!-- ponytail: no switch script; global economy tier via CLAUDE_CODE_SUBAGENT_MODEL=sonnet, per-agent via model: frontmatter. -->
+
+| Agent | Purpose | Model | Writes? |
+|-------|---------|-------|---------|
+| @planning-lead | Analyze, plan, specify | inherit (read-only) | No |
+| @eng-worker | Implement modules | inherit | Yes (worktree) |
+| @validator | Test, verify, review | inherit (read-only + tests) | No |
 
 ## Quick Reference
 
 - Plan a feature: `/plan "description"` or `@planning-lead analyze and plan: ...`
-- Implement a plan: `/implement` or spawn `@eng-worker-alpha` / `@eng-worker-beta` agents per task
+- Implement a plan: `/orchestrate "description"` (full pipeline) or spawn `@eng-worker` agents per task
 - Validate: `/validate` or `@validator run full test suite and review`
 - Full pipeline: `/orchestrate "description"`
-
----
-
-## Agent Teams Variant (Experimental)
-
-If you have enabled experimental Agent Teams (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), use this variant for complex tasks:
-
-1. Describe the task and teammates you want
-2. The lead (you) creates tasks and assigns them
-3. Teammates work in parallel, communicate with each other
-4. Synthesize results when all teammates are done
-
-Example prompt:
-```
-Spawn 4 teammates to implement the user profile feature:
-- 'backend' teammate: implement API endpoints in src/api/profiles/
-- 'frontend' teammate: implement profile UI in src/components/profile/
-- 'tests' teammate: write integration tests in tests/profiles/
-- 'reviewer' teammate: review code as it's committed
-Use the `eng-worker-alpha` agent type for complex implementers and `eng-worker-beta` for straightforward ones; `validator` for the reviewer.
-```
-
-Team rules:
-- Each teammate owns distinct files — no shared file editing
-- Use plan approval for risky changes
-- Check in periodically — don't let teammates run unattended too long
-- Shut down teammates when their work is done

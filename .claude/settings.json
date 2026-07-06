@@ -52,7 +52,7 @@
         ]
       },
       {
-        "matcher": "eng-worker-alpha|eng-worker-beta",
+        "matcher": "eng-worker",
         "hooks": [
           {
             "type": "command",

@@ -2,7 +2,7 @@
 
 # 🎼 Orchestration Skill
 
-### A Claude Code orchestration harness — Planning, Engineering (dual workers), and Validation via native subagents, worktree isolation, and hooks. Switchable Max & Economy model tiers.
+### A Claude Code orchestration harness — Planning, Engineering, and Validation via native subagents, worktree isolation, and hooks. Per-agent model tiers via native frontmatter.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-subagents-blueviolet.svg)](https://docs.anthropic.com/en/docs/claude-code)
@@ -16,8 +16,6 @@ Replicate a multi-agent engineering team **entirely within Claude Code's native 
 
 Your main Claude Code session becomes the **orchestrator**, delegating to specialized subagents that run in their own context windows with scoped tools. Each subagent returns only a summary — preserving context, enforcing role boundaries, and enabling genuine parallelism.
 
-The harness ships with **two model tiers** — **Max** (Opus-heavy, best quality) and **Economy** (Sonnet/Haiku, Pro-plan friendly) — that you swap with a single command.
-
 ```
 User prompt → /orchestrate "implement feature X"
                         ↓
@@ -26,9 +24,8 @@ User prompt → /orchestrate "implement feature X"
     │  1. @planning-lead (foreground, read-only)  │
     │     → Reads codebase, produces plan.md      │
     │                                             │
-    │  2. @eng-worker-alpha + @eng-worker-beta    │
-    │     (background, worktree)                  │
-    │     → Each implements independent module    │
+    │  2. @eng-worker (background, worktree)      │
+    │     → Spawns N instances, one per module    │
     │     → Parallel via isolation: worktree      │
     │                                             │
     │  3. Orchestrator merges worktrees           │
@@ -58,9 +55,7 @@ cd /path/to/your/project && claude
 /orchestrate "Add JWT authentication with login and signup UI"
 ```
 
-That's it. Claude Code loads the agents, slash commands, and hooks automatically. Use `/orchestrate` for the full pipeline, or `/plan`, `/implement`, `/validate` to run individual phases.
-
-> **Pick a model tier first.** The repo defaults to **Max** mode. If you're on a Pro plan, switch to Economy to control cost: `./scripts/switch-mode.sh economy`. See [Model Tiers](#model-tiers).
+That's it. Claude Code loads the agents, slash commands, and hooks automatically. Use `/orchestrate` for the full pipeline, or `/plan`, `/validate` to run individual phases.
 
 > **Prefer to cherry-pick?** Copy just the agents you need from [`.claude/agents/`](.claude/agents/) and the relevant commands from [`.claude/commands/`](.claude/commands/).
 
@@ -85,38 +80,13 @@ That's it. Claude Code loads the agents, slash commands, and hooks automatically
 
 ## 🧑‍🚀 The Agent Roster
 
-The engineering role is split across **two workers** so tasks can run in parallel without file conflicts, and so each task is matched to an appropriate model tier:
+The harness keeps a deliberately small roster — **3 agents**, comfortably in the 3–5 sweet spot. The engineering role is a single `@eng-worker` you spawn N times for parallelism (one instance per module, distinct file ownership each).
 
-- **`@eng-worker-alpha`** — the senior worker. Complex and critical modules: auth systems, state management, API integrations, architectural decisions.
-- **`@eng-worker-beta`** — the standard worker. Straightforward modules: UI components, utility functions, tests, config files.
-
-| Agent | Role | Model (Max / Economy) | Tools | Isolation | Key Traits |
-|-------|------|----------------------|-------|-----------|------------|
-| [`@planning-lead`](.claude/agents/planning-lead.md) | Analyze, plan, specify | opus / sonnet | Read, Grep, Glob, Bash | none | Read-only, no writes. Produces detailed plan with file specs |
-| [`@eng-worker-alpha`](.claude/agents/eng-worker-alpha.md) | Implement complex modules | opus / sonnet | Read, Write, Edit, Bash, Grep, Glob | worktree | Senior worker. Critical/auth/architecture work |
-| [`@eng-worker-beta`](.claude/agents/eng-worker-beta.md) | Implement standard modules | sonnet / haiku | Read, Write, Edit, Bash, Grep, Glob | worktree | Standard worker. UI, utilities, tests, config |
-| [`@validator`](.claude/agents/validator.md) | Test, review, verify | sonnet / sonnet | Read, Bash, Grep, Glob | none | Read-only + test execution. Runs full test suite |
-| [`@reviewer`](.claude/agents/reviewer.md) _(optional)_ | Code review | opus / sonnet | Read, Grep, Glob | none | Security, performance, best practices |
-| [`@coordinator`](.claude/agents/coordinator.md) _(advanced)_ | Nested coordination | opus / sonnet | Agent(\*), Read, Bash | none | Spawns its own subagents for complex multi-phase tasks |
-
-> Models shown are **Max / Economy**. See [Model Tiers](#-model-tiers-max--economy) for how to switch.
-
-### Hermes → Claude Code Mapping
-
-This harness maps each role from a traditional multi-agent orchestrator onto Claude Code's native primitives:
-
-| Traditional Concept | Claude Code Equivalent |
-|---------------------|------------------------|
-| Orchestrator (lead) | Main Claude session + `Agent` tool |
-| Leaf worker delegation | `@subagent-name` invocation |
-| Parallel task dispatch | Multiple background subagents with `isolation: worktree` |
-| Subagent timeout | `maxTurns` field in agent frontmatter |
-| Autonomous cycle | `/loop` or Claude's goals feature |
-| Knowledge vault | MCP server or CLAUDE.md integration |
-| Hooks (PostToolUse, etc.) | `.claude/settings.json` hooks (identical concept) |
-| Planning Team | `@planning-lead` subagent (read-only, opus) |
-| Engineering Alpha/Beta | `@eng-worker-alpha` + `@eng-worker-beta` subagents (worktree isolation) |
-| Validation Team | `@validator` subagent (read-only + test execution) |
+| Agent | Role | Model | Tools | Isolation | Key Traits |
+|-------|------|-------|-------|-----------|------------|
+| [`@planning-lead`](.claude/agents/planning-lead.md) | Analyze, plan, specify | inherit | Read, Grep, Glob, Bash | none | Read-only, no writes. Produces detailed plan with file specs |
+| [`@eng-worker`](.claude/agents/eng-worker.md) | Implement modules | inherit | Read, Write, Edit, Bash, Grep, Glob | worktree | Spawn N for parallel work; disjoint file ownership per instance |
+| [`@validator`](.claude/agents/validator.md) | Test, review, verify | inherit | Read, Bash, Grep, Glob | none | Read-only + test execution. Runs full test suite |
 
 ---
 
@@ -128,13 +98,13 @@ Agents are plain Markdown files with YAML frontmatter. Edit any file in `.claude
 
 ```yaml
 ---
-name: eng-worker-alpha
-model: opus              # opus, sonnet, haiku, or inherit
-tools: Read, Write, Edit, Bash
+name: eng-worker
+model: inherit           # opus, sonnet, haiku, or inherit
+tools: Read, Write, Edit, Bash, Grep, Glob
 isolation: worktree
 background: true
 maxTurns: 50
-description: "Senior implementation worker..."
+description: "Implementation worker..."
 ---
 ```
 
@@ -144,53 +114,13 @@ After editing, restart Claude Code or run `/agents` to reload.
 
 ### Model Tiers
 
-Two built-in presets for different Claude plans:
+Models are set per-agent via the `model:` frontmatter (opus/sonnet/haiku/inherit). For a global economy tier, set `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`. No script needed.
 
-| Agent | Max 🔥 | Economy 💰 |
-|-------|-------|-----------|
-| planning-lead | opus | sonnet |
-| eng-worker-alpha | opus | sonnet |
-| eng-worker-beta | sonnet | haiku |
-| validator | sonnet | sonnet |
-| reviewer | opus | sonnet |
-| coordinator | opus | sonnet |
-
-```bash
-./scripts/switch-mode.sh economy   # Pro plan
-./scripts/switch-mode.sh max       # Max plan (default)
-```
-
-To use custom models per agent, just edit the `model:` field in each `.claude/agents/*.md` file directly — no config file needed.
+<!-- ponytail: no switch script; global economy tier via CLAUDE_CODE_SUBAGENT_MODEL=sonnet, per-agent via model: frontmatter. -->
 
 ---
 
 ## 🏗 Architecture
-
-### The Pipeline
-
-The default workflow is the **Subagent Pipeline** — a sequential, phase-based flow where the orchestrator delegates to one role at a time (or spawns parallel workers within the Engineering phase):
-
-```
-User prompt → /orchestrate "implement feature X"
-                        ↓
-    ┌──── Main Claude Session (Orchestrator) ────┐
-    │                                             │
-    │  1. @planning-lead (foreground, read-only)  │
-    │     → Reads codebase, produces plan.md      │
-    │                                             │
-    │  2. @eng-worker-alpha + @eng-worker-beta    │
-    │     (background, worktree)                  │
-    │     → Each implements independent module    │
-    │     → Parallel via isolation: worktree      │
-    │                                             │
-    │  3. Orchestrator merges worktrees           │
-    │                                             │
-    │  4. @validator (foreground, read-only)      │
-    │     → Runs tests, checks imports, reviews   │
-    │                                             │
-    │  5. Report results to user                  │
-    └─────────────────────────────────────────────┘
-```
 
 ### Two Approaches
 
@@ -225,9 +155,9 @@ User types `/orchestrate "Add JWT authentication with login/signup UI"`
    - File-level specs (new files, modified files)
    - Interface contracts between modules
    - Task breakdown for parallel work
-2. **Engineering**: Main Claude dispatches the two workers in parallel:
-   - `@eng-worker-alpha` (worktree `auth-core`): JWT middleware, token validation
-   - `@eng-worker-beta` (worktree `auth-ui`): Login form, signup form, auth context
+2. **Engineering**: Main Claude dispatches two workers in parallel:
+   - `@eng-worker` (worktree `auth-core`): JWT middleware, token validation
+   - `@eng-worker` (worktree `auth-ui`): Login form, signup form, auth context
    - Both run in background simultaneously
 3. **Merge**: Orchestrator merges worktrees back to main branch
 4. **Validation**: `@validator` runs full test suite, checks imports, reviews
@@ -239,13 +169,13 @@ User types `/orchestrate "Add JWT authentication with login/signup UI"`
 User: "Users can't log in with Google OAuth — getting 500 error"
   ↓ @planning-lead (investigate root cause)
   → "The callback URL is missing trailing slash, causing redirect mismatch"
-  ↓ @eng-worker-alpha (fix)
+  ↓ @eng-worker (fix)
   → Adds trailing slash normalization in OAuth callback handler
   ↓ @validator (verify fix)
   → "All auth tests pass, including new regression test for trailing slash"
 ```
 
-Or use the `/bugfix` slash command for this pattern directly.
+This is the `/orchestrate` loop (plan → implement → validate) on a smaller scope.
 
 ### Pattern 3: Parallel Research
 
@@ -253,13 +183,11 @@ Or use the `/bugfix` slash command for this pattern directly.
 User: "Evaluate migration paths from REST to GraphQL"
   ↓ Spawn 3 background subagents:
     @planning-lead → "Analyze current REST API surface"
-    @reviewer → "Research GraphQL schema design patterns"
-    @validator → "Assess testing implications"
+    @planning-lead → "Research GraphQL schema design patterns"
+    @validator     → "Assess testing implications"
   ↓ All run in parallel, return summaries
   ↓ Orchestrator synthesizes into recommendation
 ```
-
-Or use the `/research` slash command.
 
 ### Pattern 4: Autonomous Development Loop
 
@@ -284,8 +212,8 @@ From the main session, ask Claude:
 
 ```
 Implement the plan from @planning-lead. Spawn both eng-workers in parallel:
-- @eng-worker-alpha: implement the auth middleware (src/auth/)
-- @eng-worker-beta: implement the login UI (src/components/auth/)
+- @eng-worker: implement the auth middleware (src/auth/)
+- @eng-worker: implement the login UI (src/components/auth/)
 Both should run in the background with worktree isolation.
 ```
 
@@ -295,8 +223,8 @@ Claude dispatches both as background subagents, each in its own worktree. You ca
 
 Split work at **module boundaries**:
 
-- Alpha owns `src/auth/` — Beta owns `src/components/auth/`
-- Alpha owns backend routes — Beta owns frontend components
+- One worker owns `src/auth/` — another owns `src/components/auth/`
+- One worker owns backend routes — another owns frontend components
 - Shared files (types, config) go to ONE worker only
 
 If conflicts occur during merge, the orchestrator resolves them or dispatches a fix.
@@ -336,8 +264,6 @@ hooks:
 | `PostToolUse` | After any tool | Auto-format, auto-lint |
 | `Stop` | Subagent finishes | Converted to SubagentStop at runtime |
 
-See [`templates/settings.md`](templates/settings.md) for all hook configuration variants.
-
 ---
 
 ## 👥 Agent Teams (Experimental)
@@ -352,20 +278,6 @@ For projects needing inter-agent discussion (e.g., competing debugging hypothese
   },
   "teammateMode": "auto"
 }
-```
-
-### Team Architecture
-
-```
-Team Lead (main session)
-  ├── Spawn teammates using subagent definitions
-  │   ├── @planning-lead as "architect" teammate
-  │   ├── @eng-worker-alpha as "backend-dev" teammate
-  │   ├── @eng-worker-beta as "frontend-dev" teammate
-  │   └── @validator as "qa" teammate
-  ├── Shared task list (auto-coordinated)
-  ├── Mailbox (inter-agent messaging)
-  └── Synthesizes results when all done
 ```
 
 ### When to Use Teams vs Subagents
@@ -395,11 +307,11 @@ Team Lead (main session)
 
 2. **Foreground subagents block the main session.** Use `background: true` for parallel work, or ask Claude to "run this in the background." Press `Ctrl+B` to background a running task.
 
-3. **Worktree merge conflicts are real.** Split work at module boundaries. If two workers touch the same file, one overwrites the other. Assign distinct file ownership per worker (e.g. Alpha owns backend, Beta owns frontend).
+3. **Worktree merge conflicts are real.** Split work at module boundaries. If two workers touch the same file, one overwrites the other. Assign distinct file ownership per worker.
 
 4. **`maxTurns` prevents runaway subagents.** Set it in agent frontmatter (e.g., `maxTurns: 50` for eng-workers, `maxTurns: 20` for planning-lead). Without it, a stuck subagent burns tokens indefinitely.
 
-5. **Agent files require session restart.** Files edited on disk aren't picked up until restart. Use `/agents` command for live management instead. This also applies after running `switch-mode.sh` — restart Claude Code.
+5. **Agent files require session restart.** Files edited on disk aren't picked up until restart. Use `/agents` command for live management instead.
 
 6. **Nested subagents have a depth limit of 5.** A subagent at depth 5 cannot spawn further subagents. Plan your delegation tree depth accordingly.
 
@@ -413,9 +325,9 @@ Team Lead (main session)
 
 11. **`Explore` and `Plan` built-in agents skip CLAUDE.md.** They're designed for fast, cheap research. Custom subagents DO load CLAUDE.md. Don't rely on built-in agents for tasks that need project context.
 
-12. **Token costs scale with agent count.** Each subagent/teammate has its own context window. 3–5 agents is the sweet spot. More than 5 rarely helps and gets expensive fast. Switch to Economy mode to cut cost.
+12. **Token costs scale with agent count.** Each subagent/teammate has its own context window. 3–5 agents is the sweet spot. More than 5 rarely helps and gets expensive fast. Set `CLAUDE_CODE_SUBAGENT_MODEL=sonnet` to cut cost.
 
-13. **`@`-mention syntax requires exact name.** Use `@eng-worker-alpha` not `@eng_worker_alpha`. The typeahead picker helps avoid typos.
+13. **`@`-mention syntax requires exact name.** Use `@eng-worker` not `@eng_worker`. The typeahead picker helps avoid typos.
 
 14. **Worktrees auto-clean only if no changes.** If a subagent makes changes but the merge fails, the worktree persists. Check `git worktree list` and clean up manually if needed.
 
@@ -438,30 +350,16 @@ orchestration-skill/
 ├── LICENSE                           # MIT
 ├── .claude/                          # Ready-to-use — copy into any project
 │   ├── agents/                       # Agent definitions — edit .md files directly
-│   │   ├── planning-lead.md          # Read-only planner (opus)
-│   │   ├── eng-worker-alpha.md       # Senior implementation worker (opus, worktree)
-│   │   ├── eng-worker-beta.md        # Standard implementation worker (sonnet, worktree)
-│   │   ├── validator.md              # Test runner + reviewer (sonnet)
-│   │   ├── reviewer.md               # Optional code reviewer (opus)
-│   │   └── coordinator.md            # Advanced nested coordinator (opus)
+│   │   ├── planning-lead.md          # Read-only planner
+│   │   ├── eng-worker.md             # Implementation worker (worktree; spawn N for parallelism)
+│   │   └── validator.md              # Tests + review
 │   ├── commands/
 │   │   ├── orchestrate.md            # Full pipeline
 │   │   ├── plan.md                   # Planning only
-│   │   ├── implement.md              # Engineering only
-│   │   ├── validate.md               # Validation only
-│   │   ├── review.md                 # Standalone code review
-│   │   ├── bugfix.md                 # Quick bug fix pipeline
-│   │   └── research.md               # Parallel research
+│   │   └── validate.md               # Validation only
 │   └── settings.json                 # Permissions, hooks, security gates
-├── scripts/
-│   └── switch-mode.sh                # Switch Max/Economy (sedits model: lines in-place)
-├── docs/
-│   └── subagent-internals.md         # Deep dive on subagent mechanics
-└── templates/                        # Original templates for reference/customization
-    ├── agents.md
-    ├── claude-md.md
-    ├── commands.md
-    └── settings.md
+└── docs/
+    └── subagent-internals.md         # Deep dive on subagent mechanics
 ```
 
 ---
@@ -471,13 +369,12 @@ orchestration-skill/
 After setting up in your project, verify:
 
 - [ ] `.claude/agents/` contains all agent files with correct frontmatter
-- [ ] Both `eng-worker-alpha.md` and `eng-worker-beta.md` are present (no legacy `eng-worker.md`)
 - [ ] Each agent has appropriate `tools` (read-only for planning/validation, full for eng)
-- [ ] Each eng-worker has `isolation: worktree` and `background: true`
+- [ ] `eng-worker` has `isolation: worktree` and `background: true`
 - [ ] `maxTurns` set on every agent to prevent runaway
 - [ ] CLAUDE.md has orchestration protocol section
 - [ ] Slash commands created in `.claude/commands/`
-- [ ] Model tier chosen via `./scripts/switch-mode.sh max|economy` (then restart Claude Code)
+- [ ] Model tier chosen via `model:` frontmatter or `CLAUDE_CODE_SUBAGENT_MODEL` (then restart Claude Code)
 - [ ] Test: `/orchestrate "create a hello world endpoint"` runs full pipeline
 - [ ] Verify agent isolation: planning-lead cannot write files
 - [ ] Hooks configured in `.claude/settings.json` (if used)
