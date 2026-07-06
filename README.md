@@ -21,7 +21,7 @@ User prompt → /orchestrate "implement feature X"
     ┌──── Main Claude Session (Orchestrator) ────┐
     │                                             │
     │  1. @planning-lead (foreground, read-only)  │
-    │     → Reads codebase, produces plan.md      │
+    │     → Reads codebase, produces a structured plan│
     │                                             │
     │  2. @eng-worker (background, worktree)      │
     │     → Spawns N instances, one per module    │
